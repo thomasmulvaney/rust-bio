@@ -80,7 +80,13 @@ pub trait EmissionParameters {
     /// Emission probability for (x[i], y[j]).
     /// Returns a tuple with probability and a boolean indicating whether emissions match
     /// (e.g., are the same DNA alphabet letter).
-    fn prob_emit_xy(&self, i: usize, j: usize) -> XYEmission;
+    ///
+    /// # Arguments
+    ///
+    /// * `i` - x-coordinate
+    /// * `j` - y-coordinate
+    /// * `edit_dist` - minimum edit distance among all paths up to this cell.
+    fn prob_emit_xy(&self, i: usize, j: usize, edit_dist: usize) -> XYEmission;
 
     /// Emission probability for (x[i], -).
     fn prob_emit_x(&self, i: usize) -> LogProb;
@@ -232,12 +238,13 @@ impl PairHMM {
                 let min_edit_dist_topleft = self.min_edit_dist[prev][j_minus_one];
                 let min_edit_dist_top = self.min_edit_dist[curr][j_minus_one];
                 let min_edit_dist_left = self.min_edit_dist[prev][j_];
+                let min_edit_dist = cmp::min(
+                    min_edit_dist_topleft,
+                    cmp::min(min_edit_dist_top, min_edit_dist_left),
+                );
 
                 if let Some(max_edit_dist) = max_edit_dist {
-                    if cmp::min(
-                        min_edit_dist_topleft,
-                        cmp::min(min_edit_dist_top, min_edit_dist_left),
-                    ) > max_edit_dist
+                    if min_edit_dist > max_edit_dist
                     {
                         // skip this cell if best edit dist is already larger than given maximum
                         continue;
@@ -252,7 +259,7 @@ impl PairHMM {
                     let fy_prev = &self.fy[prev];
 
                     // match or mismatch
-                    let emit_xy = emission_params.prob_emit_xy(i, j);
+                    let emit_xy = emission_params.prob_emit_xy(i, j, min_edit_dist);
                     let prob_match_mismatch = emit_xy.prob()
                         + ln_sum3_exp_approx(
                             prob_no_gap + fm_prev[j_minus_one],
@@ -379,7 +386,7 @@ mod tests {
     }
 
     impl EmissionParameters for TestEmissionParams {
-        fn prob_emit_xy(&self, i: usize, j: usize) -> XYEmission {
+        fn prob_emit_xy(&self, i: usize, j: usize, _: usize) -> XYEmission {
             if self.x[i] == self.y[j] {
                 XYEmission::Match(LogProb::from(Prob(1.0) - PROB_ILLUMINA_SUBST))
             } else {
