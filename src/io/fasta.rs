@@ -67,19 +67,19 @@ impl Reader<fs::File> {
     /// the id of each record.
     ///
     /// ```no_run
-    /// use std::error::Error;
-    /// use bio::io::fasta::Reader;
+    /// # use std::error::Error;
+    /// # use bio::io::fasta::Reader;
     ///
-    /// fn main() -> Result<(), Box<Error>> {
-    ///     // Check for errors when opening from a file
-    ///     let mut reader = Reader::from_file("C_elegans.fasta")?;
-    ///     for result in reader.records() {
-    ///         // Check for errors when processing records
-    ///         let record = result?;
-    ///         println!("{}", record.id());
-    ///     }
-    ///     Ok(())
+    /// # fn main() -> Result<(), Box<Error>> {
+    /// // Check for errors when opening from a file
+    /// let mut reader = Reader::from_file("C_elegans.fasta")?;
+    /// for result in reader.records() {
+    ///     // Check for errors when processing records
+    ///     let record = result?;
+    ///     println!("{}", record.id());
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         fs::File::open(path).map(Reader::new)
