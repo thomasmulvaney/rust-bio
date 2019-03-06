@@ -7,10 +7,23 @@
 //!
 //! # Example
 //!
-//! ```
+//! This example reads FASTA files from STDIN and prints the id and sequence length of
+//! of each record to STDOUT.
+//!
+//! ```no_run
+//! use std::error::Error;
 //! use std::io;
 //! use bio::io::fasta;
-//! let reader = fasta::Reader::new(io::stdin());
+//!
+//! fn main() -> Result<(), Box<Error>> {
+//!     let reader = fasta::Reader::new(io::stdin());
+//!
+//!     for result in reader.records() {
+//!         let record = result?;
+//!         println!("{} {}", record.id(), record.seq().len());
+//!     }
+//!     Ok(())
+//! }
 //! ```
 
 use std::cmp::min;
@@ -41,25 +54,56 @@ pub struct Reader<R: io::Read> {
 }
 
 impl Reader<fs::File> {
-    /// Read FASTA from given file path.
+    /// Creates a FASTA reader for the given path.
+    ///
+    /// # Errors
+    ///
+    /// If there are any issues opening the file an error
+    /// variant will be returned.
+    ///
+    /// # Example
+    ///
+    /// This example opens the file `C_elegans.fasta` and prints
+    /// the ids of each contig.
+    ///
+    /// ```no_run
+    /// use std::error::Error;
+    /// use bio::io::fasta::Reader;
+    ///
+    /// fn main() -> Result<(), Box<Error>> {
+    ///     // Check for errors when opening from a file
+    ///     let mut reader = Reader::from_file("C_elegans.fasta")?;
+    ///     for result in reader.records() {
+    ///         // Check for errors when processing records
+    ///         let record = result?;
+    ///         println!("{}", record.id());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         fs::File::open(path).map(Reader::new)
     }
 }
 
 impl<R: io::Read> Reader<R> {
-    /// Create a new Fasta reader given an instance of `io::Read`.
+    /// Create a new FASTA reader given an instance of `io::Read`.
     ///
     /// # Example
+    ///
+    /// This example builds a reader from a sequence of `bytes`.
+    ///
     /// ```rust
-    /// # use std::io;
-    /// # use bio::io::fasta::Reader;
-    /// # fn main() {
-    /// # const fasta_file: &'static [u8] = b">id desc
-    /// # AAAA
-    /// # ";
-    /// let reader = Reader::new(fasta_file);
-    /// # }
+    /// use std::error::Error;
+    /// use std::io;
+    /// use bio::io::fasta::Reader;
+    /// fn main() -> Result<(), Box<Error>> {
+    ///     const fasta_file: &'static [u8] = b">id desc
+    /// AAAA
+    /// ";
+    ///     let reader = Reader::new(fasta_file);
+    ///     Ok(())
+    /// }
     /// ```
     pub fn new(reader: R) -> Self {
         Reader {
@@ -68,25 +112,27 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    /// Return an iterator over the records of this Fasta file.
+    /// Return an iterator over the records of a FASTA file.
     ///
     /// # Example
     /// ```rust
-    /// # use std::io;
-    /// # use bio::io::fasta::Reader;
-    /// # use bio::io::fasta::Record;
-    /// # fn main() {
-    /// # const fasta_file: &'static [u8] = b">id desc
-    /// # AAAA
-    /// # ";
-    /// # let reader = Reader::new(fasta_file);
-    /// for record in reader.records() {
-    ///     let record = record.unwrap();
-    ///     assert_eq!(record.id(), "id");
-    ///     assert_eq!(record.desc().unwrap(), "desc");
-    ///     assert_eq!(record.seq().to_vec(), b"AAAA");
+    /// use std::error::Error;
+    /// use bio::io::fasta::Reader;
+    ///
+    /// fn main() -> Result<(), Box<Error>> {
+    ///     const fasta_file: &'static [u8] = b">id desc
+    /// AAAA
+    /// ";
+    ///     let reader = Reader::new(fasta_file);
+    ///     for record in reader.records() {
+    ///         // Check for errors
+    ///         let record = record?;
+    ///         assert_eq!(record.id(), "id");
+    ///         assert_eq!(record.desc().unwrap(), "desc");
+    ///         assert_eq!(record.seq().to_vec(), b"AAAA");
+    ///     }
+    ///     Ok(())
     /// }
-    /// # }
     /// ```
     pub fn records(self) -> Records<R> {
         Records {
@@ -100,25 +146,42 @@ impl<R> FastaRead for Reader<R>
 where
     R: io::Read,
 {
-    /// Read next FASTA record into the given `Record`.
+    /// Read the next FASTA record into the given `Record`.
+    /// An empty record indicates that no more records can be read.
+    ///
+    /// Use this method when you want to read records as fast as
+    /// possible because it allows the reuse of a `Record` allocation.
+    ///
+    /// The [records](Reader::records) iterator provides a more ergonomic
+    /// approach to accessing FASTA records.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the record is incomplete,
+    /// syntax is violated or any form of I/O error is encountered.
     ///
     /// # Example
-    /// ```rust
-    /// # use std::io;
-    /// # use bio::io::fasta::{Reader, FastaRead};
-    /// # use bio::io::fasta::Record;
-    /// # fn main() {
-    /// # const fasta_file: &'static [u8] = b">id desc
-    /// # AAAA
-    /// # ";
-    /// # let mut reader = Reader::new(fasta_file);
-    /// let mut record = Record::new();
-    /// reader.read(&mut record);
     ///
-    /// assert_eq!(record.id(), "id");
-    /// assert_eq!(record.desc().unwrap(), "desc");
-    /// assert_eq!(record.seq().to_vec(), b"AAAA");
-    /// # }
+    /// ```rust
+    /// use std::error::Error;
+    /// use bio::io::fasta::{Reader, FastaRead};
+    /// use bio::io::fasta::Record;
+    ///
+    /// fn main() -> Result<(), Box<Error>> {
+    ///     const fasta_file: &'static [u8] = b">id desc
+    /// AAAA
+    /// ";
+    ///     let mut reader = Reader::new(fasta_file);
+    ///     let mut record = Record::new();
+    ///
+    ///     // Check for errors parsing the record
+    ///     reader.read(&mut record)?;
+    ///
+    ///     assert_eq!(record.id(), "id");
+    ///     assert_eq!(record.desc().unwrap(), "desc");
+    ///     assert_eq!(record.seq().to_vec(), b"AAAA");
+    ///     Ok(())
+    /// }
     /// ```
     fn read(&mut self, record: &mut Record) -> io::Result<()> {
         record.clear();
@@ -540,7 +603,7 @@ impl<'a, R: io::Read + io::Seek + 'a> Iterator for IndexedReaderIterator<'a, R> 
     }
 }
 
-/// A Fasta writer.
+/// A FASTA writer.
 #[derive(Debug)]
 pub struct Writer<W: io::Write> {
     writer: io::BufWriter<W>,
@@ -554,19 +617,19 @@ impl Writer<fs::File> {
 }
 
 impl<W: io::Write> Writer<W> {
-    /// Create a new Fasta writer.
+    /// Create a new FASTA writer.
     pub fn new(writer: W) -> Self {
         Writer {
             writer: io::BufWriter::new(writer),
         }
     }
 
-    /// Directly write a Fasta record.
+    /// Directly write a FASTA record.
     pub fn write_record(&mut self, record: &Record) -> io::Result<()> {
         self.write(record.id(), record.desc(), record.seq())
     }
 
-    /// Write a Fasta record with given id, optional description and sequence.
+    /// Write a FASTA record with given id, optional description and sequence.
     pub fn write(&mut self, id: &str, desc: Option<&str>, seq: TextSlice<'_>) -> io::Result<()> {
         r#try!(self.writer.write_all(b">"));
         r#try!(self.writer.write_all(id.as_bytes()));
@@ -605,7 +668,7 @@ impl Record {
         }
     }
 
-    /// Create a new Fasta record from given attributes.
+    /// Create a new FASTA record from given attributes.
     pub fn with_attrs(id: &str, desc: Option<&str>, seq: TextSlice<'_>) -> Self {
         let desc = match desc {
             Some(desc) => Some(desc.to_owned()),
@@ -623,7 +686,7 @@ impl Record {
         self.id.is_empty() && self.desc.is_none() && self.seq.is_empty()
     }
 
-    /// Check validity of Fasta record.
+    /// Check validity of FASTA record.
     pub fn check(&self) -> Result<(), &str> {
         if self.id().is_empty() {
             return Err("Expecting id for Fasta record.");
@@ -661,7 +724,7 @@ impl Record {
     }
 }
 
-/// An iterator over the records of a Fasta file.
+/// An iterator over the records of a FASTA file.
 pub struct Records<R: io::Read> {
     reader: Reader<R>,
     error_has_occured: bool,
