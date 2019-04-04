@@ -4,14 +4,17 @@ use quickcheck::{quickcheck, TestResult};
 use bv::BitVec;
 use bio::data_structures::rank_select::RankSelect;
 
-/// RankIndex stores all the ranks of things in a list.
+/// RankIndex
 ///
-/// To build an index of rankings of a thing in a list:
+/// Given a list we can use this data structure to rank items.
+/// For example the ranks of all 'A's in a DNA sequence or the '0's in a bitmap.
+///
+/// To build the index:
 ///
 ///  1. Construct the RankIndex: RankIndex::default()
-///  2. Iterate over the list, for each item:
-///     * If it is a thing call the bump() method
-///     * If it is not a thing, call keep()
+///  2. Iterate over a list, for each item:
+///     * If it is something we want to rank call the bump() method
+///     * If it is not, call pass()
 #[derive(Default)]
 struct RankIndex {
     rank: Vec<u64>,
@@ -23,7 +26,7 @@ impl RankIndex {
         self.rank.push(rank);
     }
 
-    fn keep(&mut self) {
+    fn pass(&mut self) {
         let rank = self.rank.last().map_or(0, |x| *x) as u64;
         self.rank.push(rank);
     }
@@ -47,10 +50,10 @@ impl TestRank {
         for &bit in bv {
             if bit {
                 tr.rank_1.bump();
-                tr.rank_0.keep();
+                tr.rank_0.pass();
             } else {
                 tr.rank_0.bump();
-                tr.rank_1.keep();
+                tr.rank_1.pass();
             }
         }
         tr
