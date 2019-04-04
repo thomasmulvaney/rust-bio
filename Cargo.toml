@@ -48,6 +48,9 @@ strum_macros = "0.13"
 version = "0.8"
 features = ["eders"]
 
+[dev-dependencies]
+quickcheck = "0.8"
+
 [package.metadata.release]
 pre-release-commit-message = "release version {{version}}"
 tag-message = "Version {{version}} of Rust-Bio."
