@@ -30,7 +30,7 @@ const MAX_FASTA_BUFFER_SIZE: usize = 512;
 
 /// Trait for FASTA readers.
 pub trait FastaRead {
-    fn read(&mut self, record: &mut Record) -> io::Result<()>;
+    fn read(&mut self, record: &mut Record) -> io::Result<bool>;
 }
 
 /// A FASTA reader.
@@ -136,12 +136,12 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    fn read(&mut self, record: &mut Record) -> io::Result<()> {
+    fn read(&mut self, record: &mut Record) -> io::Result<bool> {
         record.clear();
         if self.line.is_empty() {
             self.reader.read_line(&mut self.line)?;
             if self.line.is_empty() {
-                return Ok(());
+                return Ok(false);
             }
         }
 
@@ -163,7 +163,7 @@ where
             record.seq.push_str(self.line.trim_end());
         }
 
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -692,8 +692,8 @@ impl<R: io::Read> Iterator for Records<R> {
         } else {
             let mut record = Record::new();
             match self.reader.read(&mut record) {
-                Ok(()) if record.is_empty() => None,
-                Ok(()) => Some(Ok(record)),
+                Ok(false) => None,
+                Ok(true) => Some(Ok(record)),
                 Err(err) => {
                     self.error_has_occured = true;
                     Some(Err(err))

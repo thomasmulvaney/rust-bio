@@ -26,7 +26,7 @@ use crate::utils::TextSlice;
 
 /// Trait for FASTQ readers.
 pub trait FastqRead {
-    fn read(&mut self, record: &mut Record) -> io::Result<()>;
+    fn read(&mut self, record: &mut Record) -> io::Result<bool>;
 }
 
 /// A FastQ reader.
@@ -78,8 +78,8 @@ impl<R> FastqRead for Reader<R>
 where
     R: io::Read,
 {
-    /// Read the next FASTQ entry into the given `Record`.
-    /// An empty record indicates that no more records can be read.
+    /// Read the next FASTQ entry into the given `Record`. Returns true
+    /// if successful.
     ///
     /// This method is useful when you want to read records as fast as
     /// possible because it allows the reuse of a `Record` allocation.
@@ -117,36 +117,31 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    fn read(&mut self, record: &mut Record) -> io::Result<()> {
+    fn read(&mut self, record: &mut Record) -> io::Result<bool> {
         record.clear();
         self.line_buf.clear();
 
         self.reader.read_line(&mut self.line_buf)?;
 
-        if !self.line_buf.is_empty() {
-            if !self.line_buf.starts_with('@') {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Expected @ at record start.",
-                ));
-            }
-            let mut header_fields = self.line_buf[1..].trim_end().splitn(2, ' ');
-            record.id = header_fields.next().unwrap_or_default().to_owned();
-            record.desc = header_fields.next().map(|s| s.to_owned());
-            self.reader.read_line(&mut record.seq)?;
-            self.reader.read_line(&mut self.line_buf)?;
-            self.reader.read_line(&mut record.qual)?;
-            if record.qual.is_empty() {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Incomplete record. Each FastQ record has to consist \
-                     of 4 lines: header, sequence, separator and \
-                     qualities.",
-                ));
-            }
-        }
+        if self.line_buf.is_empty() { return Ok(false) }
 
-        Ok(())
+        if !self.line_buf.starts_with('@') {
+            return Err(io::Error::new(io::ErrorKind::Other, "Expected @ at record start."))
+        }
+        let mut header_fields = self.line_buf[1..].trim_end().splitn(2, ' ');
+        record.id = header_fields.next().unwrap_or_default().to_owned();
+        record.desc = header_fields.next().map(|s| s.to_owned());
+        self.reader.read_line(&mut record.seq)?;
+        self.reader.read_line(&mut self.line_buf)?;
+        self.reader.read_line(&mut record.qual)?;
+        if record.qual.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Incomplete record. Each FastQ record has to consist \
+                 of 4 lines: header, sequence, separator and \
+                 qualities."))
+        }
+        return Ok(true)
     }
 }
 
@@ -285,8 +280,8 @@ impl<R: io::Read> Iterator for Records<R> {
     fn next(&mut self) -> Option<io::Result<Record>> {
         let mut record = Record::new();
         match self.reader.read(&mut record) {
-            Ok(()) if record.is_empty() => None,
-            Ok(()) => Some(Ok(record)),
+            Ok(false) => None,
+            Ok(true) => Some(Ok(record)),
             Err(err) => Some(Err(err)),
         }
     }
