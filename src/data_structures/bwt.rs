@@ -81,7 +81,7 @@ pub struct Occ {
 }
 
 impl Occ {
-    /// Calculate occ array with sampling from BWT of length n.
+	/// Calculate occ array with sampling from BWT of length n.
     /// Time complexity: O(n).
     /// Space complexity: O(n / k * A) with A being the alphabet size.
     /// Alphabet size is determined on the fly from the BWT.
@@ -111,7 +111,7 @@ impl Occ {
     }
 
     /// Get occurrence count of symbol a in BWT[..r+1].
-    /// Complexity: O(k).
+	/// Complexity: O(k).
     pub fn get(&self, bwt: &BWTSlice, r: usize, a: u8) -> usize {
         // NOTE:
         //
@@ -141,8 +141,10 @@ impl Occ {
 
         // Get the occurences at the low checkpoint
         let lo_occ = self.occ[lo_checkpoint][a as usize];
+	let hi_idx = hi_checkpoint * self.k as usize;
+        let lo_idx = lo_checkpoint * self.k as usize;
 
-        // If there is a high checkpoint we can potentially use is it to find
+	// If there is a high checkpoint we can potentially use is it to find
         // the occurences faster.
         if let Some(hi_occs) = self.occ.get(hi_checkpoint) {
             let hi_occ = hi_occs[a as usize];
@@ -153,16 +155,16 @@ impl Occ {
                 return lo_occ;
             }
 
-            // If r is closer to the high checkpoint, count backwards from there.
-            let hi_idx = hi_checkpoint * self.k as usize;
-            if (hi_idx - r) < (self.k as usize / 2) {
-                let hi_occ = hi_occs[a as usize];
-                return hi_occ - bytecount::count(&bwt[r + 1..=hi_idx], a) as usize;
-            }
-        }
+	    if self.k < 64 {
+		// If r is closer to the high checkpoint, count backwards from there.
+		if (hi_idx - r) < (self.k as usize / 2) {
+		    let hi_occ = hi_occs[a as usize];
+		    return hi_occ - bytecount::count(&bwt[r + 1..=hi_idx], a) as usize;
+		}
+	    }
+	}
 
         // Otherwise the default case is to count from the low checkpoint.
-        let lo_idx = lo_checkpoint * self.k as usize;
         return lo_occ + bytecount::count(&bwt[lo_idx + 1..=r], a) as usize;
     }
 }
