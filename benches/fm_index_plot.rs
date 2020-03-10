@@ -7,9 +7,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let alphabet = alphabets::dna::iupac_alphabet();
     let sequence = b"CGCCATCTCTGTGCAGGTGGGCCGACGAGACACTGCCCCTGATTTCT";
     let mut group = c.benchmark_group("group");
-    for size in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024].iter() {
+    for size in [256, 512, 1024, 2048, 4096, 8192].iter() {
+    //for size in [1, 2, 4, 8, 16, 32, 64, 128, 256].iter() {
 	group.throughput(Throughput::Elements(*size as u64));
-	group.bench_with_input(BenchmarkId::new("New", size), size, |b, &size| {
+	group.bench_with_input(BenchmarkId::new("Old", size), size, |b, &size| {
 	    use bio::data_structures::bwt::{bwt, less, Occ, BWT, Less};
 	    use bio::data_structures::fmindex::{FMIndex, FMIndexable};
 	    let sa = suffix_array(STR_1);
@@ -20,7 +21,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 	    b.iter(|| fmindex.backward_search(sequence.iter()));
 	});
 
-	group.bench_with_input(BenchmarkId::new("Old", size), size, |b, &size| {
+	group.bench_with_input(BenchmarkId::new("New", size), size, |b, &size| {
+	    use bio::data_structures::bwt_new::{bwt, less, Occ, BWT, Less};
+	    use bio::data_structures::fmindex_new::{FMIndex, FMIndexable};
 	    let sa = suffix_array(STR_1);
 	    let bwt = bwt(STR_1, &sa);
 	    let less = less(&bwt, &alphabet);
@@ -605,4 +608,4 @@ CGTGCCGTTTCTCTGCGAACAACACCTCGAGCTGTACCGTTGTTGCGCTGCCTAGATGCAGTGCCGCTCCTATCACATT\
 TGCCTCGACGACTGCCGCCTTCGCTGTTTCCCTAGACACTCAACAGTAAGCGCCTTTTGTAGGCAGGGGCACCCCCTGT\
 CAGTGGCTGCGCCAAAACGTCTTCGGATCCCCTTGTCCAATCAAACTGACCGAATTCTTTCATTTAAGACCCTAATATG\
 ACATCATTAGTGACTAAATGCCACTCCCAAAATTCTGCCCAGAAGCGTTTAAGTTCGCCCCACTAAAGTTGTCTAAAAC\
-GA";
+GA$";
