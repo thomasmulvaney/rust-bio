@@ -1,27 +1,32 @@
 use criterion::{BenchmarkId, black_box, criterion_group, criterion_main, Criterion, Throughput};
 
 use bio::alphabets;
-use bio::data_structures::bwt::{bwt, less, Occ, BWT, Less};
-use bio::data_structures::fmindex::{FMIndex, FMIndexable};
 use bio::data_structures::suffix_array::suffix_array;
-
-fn search(fmindex: &FMIndex<&BWT,&Less,&Occ>) {
-    let sequence = b"CGCCATCTCTGTGCAGGTGGGCCGACGAGACACTGCCCCTGATTTCT";
-    fmindex.backward_search(sequence.iter());
-}
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let alphabet = alphabets::dna::iupac_alphabet();
-    let sa = suffix_array(STR_1);
-    let bwt = bwt(STR_1, &sa);
-    let less = less(&bwt, &alphabet);
+    let sequence = b"CGCCATCTCTGTGCAGGTGGGCCGACGAGACACTGCCCCTGATTTCT";
     let mut group = c.benchmark_group("group");
     for size in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024].iter() {
 	group.throughput(Throughput::Elements(*size as u64));
-	group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+	group.bench_with_input(BenchmarkId::new("New", size), size, |b, &size| {
+	    use bio::data_structures::bwt::{bwt, less, Occ, BWT, Less};
+	    use bio::data_structures::fmindex::{FMIndex, FMIndexable};
+	    let sa = suffix_array(STR_1);
+	    let bwt = bwt(STR_1, &sa);
+	    let less = less(&bwt, &alphabet);
 	    let occ = Occ::new(&bwt, size, &alphabet);
 	    let fmindex = FMIndex::new(&bwt, &less, &occ);
-	    b.iter(|| search(black_box(&fmindex)));
+	    b.iter(|| fmindex.backward_search(sequence.iter()));
+	});
+
+	group.bench_with_input(BenchmarkId::new("Old", size), size, |b, &size| {
+	    let sa = suffix_array(STR_1);
+	    let bwt = bwt(STR_1, &sa);
+	    let less = less(&bwt, &alphabet);
+	    let occ = Occ::new(&bwt, size, &alphabet);
+	    let fmindex = FMIndex::new(&bwt, &less, &occ);
+	    b.iter(|| fmindex.backward_search(sequence.iter()));
 	});
     }
 }
@@ -601,4 +606,3 @@ TGCCTCGACGACTGCCGCCTTCGCTGTTTCCCTAGACACTCAACAGTAAGCGCCTTTTGTAGGCAGGGGCACCCCCTGT\
 CAGTGGCTGCGCCAAAACGTCTTCGGATCCCCTTGTCCAATCAAACTGACCGAATTCTTTCATTTAAGACCCTAATATG\
 ACATCATTAGTGACTAAATGCCACTCCCAAAATTCTGCCCAGAAGCGTTTAAGTTCGCCCCACTAAAGTTGTCTAAAAC\
 GA";
-
